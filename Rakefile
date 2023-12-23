@@ -253,7 +253,7 @@ task :bench do
         exec ip_address, "rm -rf tmp/*", cwd: RUBY_APP_DIR
     end
 
-    puts `#{CURL_COMMAND}`
+    # puts `#{CURL_COMMAND}`
 end
 
 desc "collect metrics"
