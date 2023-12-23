@@ -34,24 +34,23 @@ GITHUB_ISSUE_ID = 1
 BUNDLE = "/home/isucon/local/ruby/bin/bundle"
 
 CURL_COMMAND = <<~CURL
-curl 'https://portal.isucon.net/contest/jobs/enqueue/' \
-  -X 'POST' \
-  -H 'authority: portal.isucon.net' \
-  -H 'accept: */*' \
-  -H 'accept-language: en-US,en;q=0.9' \
-  -H 'content-length: 0' \
-  -H 'cookie: _gid=GA1.2.1851835201.1700708594; csrftoken=DQe8G7D7fG3YVXFgvR2W1EWJItyW4IWv; sessionid=e3i94hkzztmjkbe1iq1u14fy3ru2nxl2; _ga=GA1.1.174299771.1700708594; _ga_85HKR6CF7G=GS1.1.1700875537.7.0.1700875600.0.0.0' \
-  -H 'origin: https://portal.isucon.net' \
-  -H 'referer: https://portal.isucon.net/contest/' \
-  -H 'sec-ch-ua: "Google Chrome";v="119", "Chromium";v="119", "Not?A_Brand";v="24"' \
+curl 'https://api.isunarabe.org/portal.Portal/GetBenchmarkJob' \
+  -H 'authority: api.isunarabe.org' \
+  -H 'accept: application/grpc-web-text' \
+  -H 'accept-language: ja-JP,ja;q=0.9,en-US;q=0.8,en;q=0.7' \
+  -H 'content-type: application/grpc-web-text' \
+  -H 'cookie: SESSION=4PVa58FdltVKEgZrs6jw62WeduSZfjSO4n7UVQsALj%2Fd07OdTCymm58h6wK2niuht8wLNySqNy2kj12VNWF8SpfT38uDrxbN%2FFD0i5PfYRRJ7zm1kkB4bq7tCqp4tAgT6%2FFi' \
+  -H 'origin: https://isunarabe.org' \
+  -H 'referer: https://isunarabe.org/' \
+  -H 'sec-ch-ua: "Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"' \
   -H 'sec-ch-ua-mobile: ?0' \
   -H 'sec-ch-ua-platform: "macOS"' \
   -H 'sec-fetch-dest: empty' \
   -H 'sec-fetch-mode: cors' \
-  -H 'sec-fetch-site: same-origin' \
-  -H 'user-agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36' \
-  -H 'x-csrftoken: B7tayO8bAIFdtmmFnJmnatWvaKMIg7FC4Nx84LB8Fey1e9RLIqe91XI4I3auaFrX' \
-  -H 'x-requested-with: XMLHttpRequest' \
+  -H 'sec-fetch-site: same-site' \
+  -H 'user-agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' \
+  -H 'x-grpc-web: 1' \
+  --data-raw 'AAAAAAMI3UE=' \
   --compressed
 CURL
 
@@ -220,7 +219,7 @@ task :record do
   sh "gh issue comment --repo #{GITHUB_REPO} #{GITHUB_ISSUE_ID} --body '#{message}'"
 end
 
-# task :all => [:setup, :deploy, :initialize, :record] # , :bench]
+task :all => [:setup, :deploy, :initialize, :record, :bench]
 
 task :push => [:setup, :deploy, :initialize, :record] # :all
 
