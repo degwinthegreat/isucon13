@@ -113,12 +113,9 @@ module Isupipe
         nil
       end
 
-      def fill_livestream_response(tx, livestream_model, user_response = nil)
-        owner = user_response.nil? ? nil : user_response
-        if owner.nil?
-          owner_model = tx.xquery('SELECT * FROM users WHERE id = ?', livestream_model.fetch(:user_id)).first
-          owner = fill_user_response(tx, owner_model)
-        end
+      def fill_livestream_response(tx, livestream_model)
+        owner_model = tx.xquery('SELECT * FROM users WHERE id = ?', livestream_model.fetch(:user_id)).first
+        owner = fill_user_response(tx, owner_model)
 
         # Get all livestream_tag_models for this livestream in one query
         livestream_tag_ids = tx.xquery('SELECT tag_id FROM livestream_tags WHERE livestream_id = ?', livestream_model.fetch(:id), as: :array).map(&:first)
@@ -140,20 +137,20 @@ module Isupipe
         end
 
         livestream_model.slice(:id, :title, :description, :playlist_url, :thumbnail_url, :start_at, :end_at).merge(
-          owner: ,
+          owner:,
           tags:,
         )
       end
 
       def fill_livecomment_response(tx, livecomment_model)
-        user_model = tx.xquery('SELECT * FROM users WHERE id = ?', livecomment_model.fetch(:user_id)).first
-        user = fill_user_response(tx, user_model)
+        comment_owner_model = tx.xquery('SELECT * FROM users WHERE id = ?', livecomment_model.fetch(:user_id)).first
+        comment_owner = fill_user_response(tx, comment_owner_model)
 
         livestream_model = tx.xquery('SELECT * FROM livestreams WHERE id = ?', livecomment_model.fetch(:livestream_id)).first
-        livestream = fill_livestream_response(tx, livestream_model, user)
+        livestream = fill_livestream_response(tx, livestream_model)
 
         livecomment_model.slice(:id, :comment, :tip, :created_at).merge(
-          user:,
+          user: comment_owner,
           livestream:,
         )
       end
