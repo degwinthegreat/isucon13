@@ -275,7 +275,7 @@ task :measure do
   exec HOSTS[:host03], "sudo cat /var/log/mysql/slow.log | slp my --format html > /tmp/slp/#{timestamp}.html"
   sh "scp #{HOSTS[:host03]}:/tmp/slp/#{timestamp}.html ./log/slp/#{timestamp}.html"
 
-#   sh "scp -r #{HOSTS[:host01]}:/home/isucon/webapp/ruby/tmp ./log/stackprof"
+  # sh "scp -r #{HOSTS[:host01]}:/home/isucon/webapp/ruby/tmp ./log/stackprof"
 
   sh "git pull"
   sh "git add -A"
