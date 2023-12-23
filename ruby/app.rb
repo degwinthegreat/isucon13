@@ -790,7 +790,6 @@ module Isupipe
       user_id = sess[DEFAULT_USER_ID_KEY]
       unless user_id
         raise HttpError.new(401)
-      end
 
       user = db_conn.xquery('SELECT * FROM users WHERE id = ?', user_id).first
       icon_path = IMAGE_DIR + "/#{user.fetch(:name)}.jpeg"
