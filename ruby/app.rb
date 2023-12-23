@@ -27,6 +27,7 @@ module Isupipe
     DEFAULT_SESSION_EXPIRES_KEY = 'EXPIRES'
     DEFAULT_USER_ID_KEY = 'USERID'
     DEFAULT_USERNAME_KEY = 'USERNAME'
+    NOIMAGE_HASH = 'd9f8294e9d895f81ce62e73dc7d5dff862a4fa40bd4e0fecf53f7526a8edcac0'
 
     class HttpError < StandardError
       attr_reader :code
@@ -181,13 +182,12 @@ module Isupipe
         theme_model = tx.xquery('SELECT * FROM themes WHERE user_id = ?', user_model.fetch(:id)).first
 
         icon_model = tx.xquery('SELECT image FROM icons WHERE user_id = ?', user_model.fetch(:id)).first
-        image =
+        icon_hash =
           if icon_model
-            icon_model.fetch(:image)
+            Digest::SHA256.hexdigest(icon_model.fetch(:image))
           else
-            File.binread(FALLBACK_IMAGE)
+            NOIMAGE_HASH
           end
-        icon_hash = Digest::SHA256.hexdigest(image)
 
         {
           id: user_model.fetch(:id),
