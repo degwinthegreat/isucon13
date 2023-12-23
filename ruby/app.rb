@@ -113,57 +113,55 @@ module Isupipe
         nil
       end
 
-      def fill_livestream_response(tx, livestream_model, user_response = nil)
-        owner = user_response.nil? ? nil : user_response
-        if owner.nil?
-          owner_model = tx.xquery('SELECT * FROM users WHERE id = ?', livestream_model.fetch(:user_id)).first
-          owner = fill_user_response(tx, owner_model)
-        end
+    def fill_livestream_response(tx, livestream_model, all_tags: nil, all_users: nil)
+        owner_model = (all_users ? all_users[livestream_model.fetch(:user_id)] : nil ) || tx.xquery('SELECT * FROM users WHERE id = ?', livestream_model.fetch(:user_id)).first
+        owner = fill_user_response(tx, owner_model)
 
-        # Get all livestream_tag_models for this livestream in one query
-        livestream_tag_ids = tx.xquery('SELECT tag_id FROM livestream_tags WHERE livestream_id = ?', livestream_model.fetch(:id), as: :array).map(&:first)
-
-        tags_models = []
-        if livestream_tag_ids.empty?
-          tags_models = []
-        else
-          # Get all tags in one query using WHERE id IN
-          tags_models = tx.xquery('SELECT * FROM tags WHERE id IN (?)', livestream_tag_ids)
-        end
-
-        # Map the tags_models to the required format
-        tags = tags_models.map do |tag_model|
-          {
-            id: tag_model.fetch(:id),
-            name: tag_model.fetch(:name),
-          }
+        tags = (all_tags ? all_tags[livestream_model.fetch(:id)] : nil) || tx.xquery('SELECT tag_id FROM livestream_tags WHERE livestream_id = ?', livestream_model.fetch(:id)).map do |livestream_tag_model|
+          TAGS_BY_ID[livestream_tag_model.fetch(:tag_id)]
         end
 
         livestream_model.slice(:id, :title, :description, :playlist_url, :thumbnail_url, :start_at, :end_at).merge(
-          owner: ,
+          owner:,
           tags:,
         )
       end
 
-      def fill_livecomment_response(tx, livecomment_model)
-        user_model = tx.xquery('SELECT * FROM users WHERE id = ?', livecomment_model.fetch(:user_id)).first
-        user = fill_user_response(tx, user_model)
+      def livestream_tags_preload(tx, livestream_models)
+        return {} if livestream_models.empty?
+        all_tags = tx.xquery('select livestream_tags.livestream_id, livestream_tags.tag_id from livestream_tags where livestream_id in (?)', livestream_models.map { _1.fetch(:id) }).to_a.group_by do |row|
+          row.fetch(:livestream_id)
+        end.transform_values do |vs|
+          vs.map { TAGS_BY_ID[_1.fetch(:tag_id)] }
+        end
+      end
 
-        livestream_model = tx.xquery('SELECT * FROM livestreams WHERE id = ?', livecomment_model.fetch(:livestream_id)).first
-        livestream = fill_livestream_response(tx, livestream_model, user)
+      def users_preload(tx, user_ids)
+        return {} if user_ids.empty?
+        tx.xquery('select * from users where id in (?)', user_ids).map do |row|
+          [row.fetch(:id), row]
+        end.to_h
+      end
+
+      def fill_livecomment_response(tx, livecomment_model, livestream_model: nil, all_livestream_tags: nil, all_users: nil)
+        comment_owner_model = (all_users ? all_users[livecomment_model.fetch(:user_id)] : nil ) || tx.xquery('SELECT * FROM users WHERE id = ?', livecomment_model.fetch(:user_id)).first
+        comment_owner = fill_user_response(tx, comment_owner_model)
+
+        livestream_model = livestream_model || tx.xquery('SELECT * FROM livestreams WHERE id = ?', livecomment_model.fetch(:livestream_id)).first
+        livestream = fill_livestream_response(tx, livestream_model, all_tags: all_livestream_tags, all_users: )
 
         livecomment_model.slice(:id, :comment, :tip, :created_at).merge(
-          user:,
+          user: comment_owner,
           livestream:,
         )
       end
 
-      def fill_livecomment_report_response(tx, report_model)
-        reporter_model = tx.xquery('SELECT * FROM users WHERE id = ?', report_model.fetch(:user_id)).first
+      def fill_livecomment_report_response(tx, report_model, livecomment_model: nil, livestream_model: nil, all_livestream_tags: nil, all_users: nil)
+        reporter_model = (all_users ? all_users[report_model.fetch(:user_id)] : nil ) || tx.xquery('SELECT * FROM users WHERE id = ?', report_model.fetch(:user_id)).first
         reporter = fill_user_response(tx, reporter_model)
 
-        livecomment_model = tx.xquery('SELECT * FROM livecomments WHERE id = ?', report_model.fetch(:livecomment_id)).first
-        livecomment = fill_livecomment_response(tx, livecomment_model)
+        livecomment_model = livecomment_model || tx.xquery('SELECT * FROM livecomments WHERE id = ?', report_model.fetch(:livecomment_id)).first
+        livecomment = fill_livecomment_response(tx, livecomment_model, livestream_model:, all_livestream_tags:, all_users: )
 
         report_model.slice(:id, :created_at).merge(
           reporter:,
@@ -171,12 +169,12 @@ module Isupipe
         )
       end
 
-      def fill_reaction_response(tx, reaction_model)
-        user_model = tx.xquery('SELECT * FROM users WHERE id = ?', reaction_model.fetch(:user_id)).first
+      def fill_reaction_response(tx, reaction_model, livestream_model: nil, all_tags: nil, all_users: nil)
+        user_model = (all_users ? all_users[reaction_model.fetch(:user_id)] : nil ) || tx.xquery('SELECT * FROM users WHERE id = ?', reaction_model.fetch(:user_id)).first
         user = fill_user_response(tx, user_model)
 
-        livestream_model = tx.xquery('SELECT * FROM livestreams WHERE id = ?', reaction_model.fetch(:livestream_id)).first
-        livestream = fill_livestream_response(tx, livestream_model)
+        livestream_model = livestream_model || tx.xquery('SELECT * FROM livestreams WHERE id = ?', reaction_model.fetch(:livestream_id)).first
+        livestream = fill_livestream_response(tx, livestream_model, all_tags: all_tags, all_users: nil)
 
         reaction_model.slice(:id, :emoji_name, :created_at).merge(
           user:,
@@ -483,9 +481,22 @@ module Isupipe
           raise HttpError.new(403, "can't get other streamer's livecomment reports")
         end
 
-        tx.xquery('SELECT * FROM livecomment_reports WHERE livestream_id = ?', livestream_id).map do |report_model|
-          fill_livecomment_report_response(tx, report_model)
-        end
+        rows = tx.xquery('SELECT * FROM livecomment_reports WHERE livestream_id = ?', livestream_id).to_a
+        livecomment_models = rows.empty? ? {}  : (
+          tx.xquery('SELECT * FROM livecomments WHERE id IN (?)', rows.map {_1.fetch(:livecomment_id) })
+          .map { [_1.fetch(:id), _1] }
+          .to_h
+        )
+        all_livestream_tags = livestream_tags_preload(tx, [livestream_model])
+        all_users = users_preload(tx, [
+          livestream_model.fetch(:user_id),
+          *rows.map { _1.fetch(:user_id) },
+          *livecomment_models.each_value.map { _1.fetch(:user_id) },
+        ])
+        rows.map do |report_model|
+          livecomment_model  = livecomment_models[report_model.fetch(:livecomment_id)]
+          !livecomment_model.nil? ?  fill_livecomment_report_response(tx, report_model, livestream_model:, livecomment_model:, all_livestream_tags:, all_users:) : nil
+        end.reject(&:nil?)
       end
 
       json(reports)
@@ -540,58 +551,44 @@ module Isupipe
     # ライブコメント投稿
     post '/api/livestream/:livestream_id/livecomment' do
       verify_user_session!
-      sess = session[DEFAULT_SESSION_ID_KEY]
-      unless sess
-        raise HttpError.new(401)
-      end
-      user_id = sess[DEFAULT_USER_ID_KEY]
-      unless sess
-        raise HttpError.new(401)
-      end
-
       livestream_id = cast_as_integer(params[:livestream_id])
 
-      req = decode_request_body(PostLivecommentRequest)
+      livestream_model = db_conn.xquery('SELECT * FROM livestreams WHERE id = ?', livestream_id).first
+      livestream = fill_livestream_response(db_conn, livestream_model)
 
-      livecomment = db_transaction do |tx|
-        livestream_model = tx.xquery('SELECT * FROM livestreams WHERE id = ?', livestream_id).first
-        unless livestream_model
-          raise HttpError.new(404, 'livestream not found')
-        end
+      query = <<~SQL
+      SELECT
+        livecomments.id AS l_id,
+        livecomments.livestream_id AS l_livestream_id,
+        livecomments.comment AS l_comment,
+        livecomments.tip AS l_tip,
+        livecomments.created_at AS l_created_at,
+        users.*
+      FROM livecomments
+      INNER JOIN users ON livecomments.user_id = users.id
+      WHERE livestream_id = ?
+      SQL
 
-        # スパム判定
-        tx.xquery('SELECT id, user_id, livestream_id, word FROM ng_words WHERE user_id = ? AND livestream_id = ?', livestream_model.fetch(:user_id), livestream_model.fetch(:id)).each do |ng_word|
-          query = <<~SQL
-            SELECT COUNT(*)
-            FROM
-            (SELECT ? AS text) AS texts
-            INNER JOIN
-            (SELECT CONCAT('%', ?, '%')	AS pattern) AS patterns
-            ON texts.text LIKE patterns.pattern
-          SQL
-          hit_spam = tx.xquery(query, req.comment, ng_word.fetch(:word), as: :array).first[0]
-          logger.info("[hit_spam=#{hit_spam}] comment = #{req.comment}")
-          if hit_spam >= 1
-            raise HttpError.new(400, 'このコメントがスパム判定されました')
-          end
-        end
-
-        now = Time.now.to_i
-        tx.xquery('INSERT INTO livecomments (user_id, livestream_id, comment, tip, created_at) VALUES (?, ?, ?, ?, ?)', user_id, livestream_id, req.comment, req.tip, now)
-        livecomment_id = tx.last_id
-
-        fill_livecomment_response(tx, {
-          id: livecomment_id,
-          user_id:,
-          livestream_id:,
-          comment: req.comment,
-          tip: req.tip,
-          created_at: now,
-        })
+      limit_str = params[:limit] || ''
+      if limit_str != ''
+        limit = cast_as_integer(limit_str)
+        query = "#{query} LIMIT #{limit}"
       end
 
-      status 201
-      json(livecomment)
+      rows = db_conn.xquery(query, livestream_id).to_a
+      livecomments = rows.map do |livecomment_model|
+        # fill_livecomment_response
+        {
+          id: livecomment_model.fetch(:l_id),
+          comment: livecomment_model.fetch(:l_comment),
+          tip: livecomment_model.fetch(:l_tip),
+          created_at: livecomment_model.fetch(:l_created_at),
+          user: fill_user_response(db_conn, livecomment_model),
+          livestream:,
+        }
+      end
+
+      json(livecomments)
     end
 
     # ライブコメント報告
@@ -630,7 +627,7 @@ module Isupipe
           livestream_id:,
           livecomment_id:,
           created_at: now,
-        })
+        }, livestream_model:, livecomment_model:)
       end
 
       status 201
@@ -705,18 +702,24 @@ module Isupipe
       verify_user_session!
 
       livestream_id = cast_as_integer(params[:livestream_id])
+      ls_tags = livestream_tags_preload(db_conn, [{id: livestream_id}])
 
-      reactions = db_transaction do |tx|
-        query = 'SELECT * FROM reactions WHERE livestream_id = ? ORDER BY created_at DESC'
-        limit_str = params[:limit] || ''
-        if limit_str != ''
-          limit = cast_as_integer(limit_str)
-          query = "#{query} LIMIT #{limit}"
-        end
+      livestream_model = db_conn.xquery('select * from livestreams where id = ?',livestream_id).first
 
-        tx.xquery(query, livestream_id).map do |reaction_model|
-          fill_reaction_response(tx, reaction_model)
-        end
+      query = 'SELECT * FROM reactions WHERE livestream_id = ? ORDER BY created_at DESC'
+      limit_str = params[:limit] || ''
+      if limit_str != ''
+        limit = cast_as_integer(limit_str)
+        query = "#{query} LIMIT #{limit}"
+      end
+
+      rows = db_conn.xquery(query, livestream_id).to_a
+      all_users = users_preload(db_conn, [
+        livestream_model.fetch(:user_id),
+        *rows.map { _1.fetch(:user_id) },
+      ])
+      reactions = rows.map do |reaction_model|
+        fill_reaction_response(db_conn, reaction_model, livestream_model:, all_tags: ls_tags, all_users:)
       end
 
       json(reactions)
