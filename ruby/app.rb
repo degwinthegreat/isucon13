@@ -765,6 +765,7 @@ module Isupipe
 
       content_type 'image/jpeg'
       if image
+        etag Digest::SHA256.hexdigest(image[:image])
         image[:image]
       else
         send_file FALLBACK_IMAGE
