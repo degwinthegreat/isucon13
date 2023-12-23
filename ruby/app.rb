@@ -9,6 +9,7 @@ require 'open3'
 require 'securerandom'
 require 'sinatra/base'
 require 'sinatra/json'
+require 'fileutils'
 
 require 'estackprof'
 
@@ -28,6 +29,8 @@ module Isupipe
     DEFAULT_USER_ID_KEY = 'USERID'
     DEFAULT_USERNAME_KEY = 'USERNAME'
     NOIMAGE_HASH = 'd9f8294e9d895f81ce62e73dc7d5dff862a4fa40bd4e0fecf53f7526a8edcac0'
+
+    IMAGE_DIR = File.expand_path('../../public', __FILE__)
 
     class HttpError < StandardError
       attr_reader :code
@@ -184,7 +187,7 @@ module Isupipe
         icon_model = tx.xquery('SELECT image FROM icons WHERE user_id = ?', user_model.fetch(:id)).first
         icon_hash =
           if icon_model
-            Digest::SHA256.hexdigest(icon_model.fetch(:image))
+            icon_model.fetch(:image)
           else
             NOIMAGE_HASH
           end
@@ -210,6 +213,8 @@ module Isupipe
         logger.warn("init.sh failed with out=#{out}")
         halt 500
       end
+
+      puts `rm ../public/*.jpeg`
 
       json(
         language: 'ruby',
@@ -755,6 +760,7 @@ module Isupipe
     get '/api/user/:username/icon' do
       username = params[:username]
 
+      user = ""
       image = db_transaction do |tx|
         user = tx.xquery('SELECT * FROM users WHERE name = ?', username).first
         unless user
@@ -765,8 +771,8 @@ module Isupipe
 
       content_type 'image/jpeg'
       if image
-        etag Digest::SHA256.hexdigest(image[:image])
-        image[:image]
+        etag image[:image]
+        send_file IMAGE_DIR + "/#{user.fetch(:id)}.jpeg"
       else
         send_file FALLBACK_IMAGE
       end
@@ -786,12 +792,18 @@ module Isupipe
         raise HttpError.new(401)
       end
 
-      req = decode_request_body(PostIconRequest)
-      image = Base64.decode64(req.image)
+      # req = decode_request_body(PostIconRequest)
+      # image = Base64.decode64(req.image)
+      body = JSON.parse(request.body.tap(&:rewind).read, symbolize_names: true)
+      image = Base64.decode64(body[:image])
+      imgfile = IMAGE_DIR + "/#{user_id}.jpeg"
+      f = File.open(imgfile, "w")
+      f.write(image)
+      f.close()
 
       icon_id = db_transaction do |tx|
         tx.xquery('DELETE FROM icons WHERE user_id = ?', user_id)
-        tx.xquery('INSERT INTO icons (user_id, image) VALUES (?, ?)', user_id, image)
+        tx.xquery('INSERT INTO icons (user_id, image) VALUES (?, ?)', user_id, Digest::SHA256.hexdigest(image))
         tx.last_id
       end
 
