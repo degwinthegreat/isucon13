@@ -116,8 +116,13 @@ module Isupipe
         # Get all livestream_tag_models for this livestream in one query
         livestream_tag_ids = tx.xquery('SELECT tag_id FROM livestream_tags WHERE livestream_id = ?', livestream_model.fetch(:id), as: :array).map(&:first)
 
-        # Get all tags in one query using WHERE id IN
-        tags_models = tx.xquery('SELECT * FROM tags WHERE id IN (?)', livestream_tag_ids)
+        tags_models = []
+        if livestream_tag_ids.empty?
+          tags_models = []
+        else
+          # Get all tags in one query using WHERE id IN
+          tags_models = tx.xquery('SELECT * FROM tags WHERE id IN (?)', livestream_tag_ids)
+        end
 
         # Map the tags_models to the required format
         tags = tags_models.map do |tag_model|
