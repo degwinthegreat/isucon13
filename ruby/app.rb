@@ -643,25 +643,34 @@ module Isupipe
         tx.xquery('INSERT INTO ng_words(user_id, livestream_id, word, created_at) VALUES (?, ?, ?, ?)', user_id, livestream_id, req.ng_word, Time.now.to_i)
         word_id = tx.last_id
 
-        # NGワードにヒットする過去の投稿も全削除する
-        tx.xquery('SELECT * FROM ng_words WHERE livestream_id = ?', livestream_id).each do |ng_word|
-          # ライブコメント一覧取得
-          tx.xquery('SELECT * FROM livecomments').each do |livecomment|
-            query = <<~SQL
-              DELETE FROM livecomments
-              WHERE
-              id = ? AND
-              livestream_id = ? AND
-              (SELECT COUNT(*)
-              FROM
-              (SELECT ? AS text) AS texts
-              INNER JOIN
-              (SELECT CONCAT('%', ?, '%')	AS pattern) AS patterns
-              ON texts.text LIKE patterns.pattern) >= 1
-            SQL
-            tx.xquery(query, livecomment.fetch(:id), livestream_id, livecomment.fetch(:comment), ng_word.fetch(:word))
-          end
-        end
+        query = <<~SQL
+          DELETE lc
+          FROM livecomments lc
+          INNER JOIN ng_words nw ON lc.livestream_id = nw.livestream_id
+          WHERE lc.livestream_id = ? AND lc.comment LIKE CONCAT('%', nw.word, '%')
+        SQL
+
+        tx.xquery(query, livestream_id)
+
+        # OLD - NGワードにヒットする過去の投稿も全削除する
+        # tx.xquery('SELECT * FROM ng_words WHERE livestream_id = ?', livestream_id).each do |ng_word|
+        #   # ライブコメント一覧取得
+        #   tx.xquery('SELECT * FROM livecomments').each do |livecomment|
+        #     # query = <<~SQL
+        #     #   DELETE FROM livecomments
+        #     #   WHERE
+        #     #   id = ? AND
+        #     #   livestream_id = ? AND
+        #     #   (SELECT COUNT(*)
+        #     #   FROM
+        #     #   (SELECT ? AS text) AS texts
+        #     #   INNER JOIN
+        #     #   (SELECT CONCAT('%', ?, '%')	AS pattern) AS patterns
+        #     #   ON texts.text LIKE patterns.pattern) >= 1
+        #     # SQL
+        #     tx.xquery(query, livecomment.fetch(:id), livestream_id, livecomment.fetch(:comment), ng_word.fetch(:word))
+        #   end
+        # end
 
         word_id
       end
