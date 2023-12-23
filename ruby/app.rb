@@ -800,8 +800,7 @@ module Isupipe
       File.binwrite(icon_path, image)
 
       icon_id = db_transaction do |tx|
-        tx.xquery('DELETE FROM icons WHERE user_id = ?', user_id)
-        tx.xquery('INSERT INTO icons (user_id, image) VALUES (?, ?)', user_id, Digest::SHA256.hexdigest(image))
+        tx.xquery('UPDATE icons SET image = ? WHERE user_id = ?', Digest::SHA256.hexdigest(image), user_id)
         tx.last_id
       end
 
