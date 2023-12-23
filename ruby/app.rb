@@ -50,7 +50,7 @@ module Isupipe
 
       def connect_db
         Mysql2::Client.new(
-          host: ENV.fetch('ISUCON13_MYSQL_DIALCONFIG_ADDRESS', '127.0.0.1'),
+          host: '192.168.0.13',
           port: ENV.fetch('ISUCON13_MYSQL_DIALCONFIG_PORT', '3306').to_i,
           username: ENV.fetch('ISUCON13_MYSQL_DIALCONFIG_USER', 'isucon'),
           password: ENV.fetch('ISUCON13_MYSQL_DIALCONFIG_PASSWORD', 'isucon'),
