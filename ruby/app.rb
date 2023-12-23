@@ -10,8 +10,12 @@ require 'securerandom'
 require 'sinatra/base'
 require 'sinatra/json'
 
+require 'estackprof'
+
 module Isupipe
   class App < Sinatra::Base
+    use Estackprof::Middleware
+
     enable :logging
     set :show_exceptions, :after_handler
     set :sessions, domain: 't.isucon.pw', path: '/', expire_after: 1000*60
