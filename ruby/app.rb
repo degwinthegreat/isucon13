@@ -82,9 +82,12 @@ module Isupipe
       end
 
       def cast_as_integer(str)
-        Integer(str, 10)
-      rescue
-        raise HttpError.new(400)
+        # Integer(str, 10)
+        val = str.to_i
+        if val == 0
+          raise HttpError.new(400)
+        end
+        val
       end
 
       def verify_user_session!
