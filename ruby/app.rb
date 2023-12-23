@@ -772,7 +772,7 @@ module Isupipe
       content_type 'image/jpeg'
       if image
         etag image[:image]
-        send_file IMAGE_DIR + "/#{user.fetch(:id)}.jpeg"
+        send_file IMAGE_DIR + "/#{user.fetch(:name)}.jpeg"
       else
         send_file FALLBACK_IMAGE
       end
@@ -790,20 +790,16 @@ module Isupipe
       user_id = sess[DEFAULT_USER_ID_KEY]
       unless user_id
         raise HttpError.new(401)
-      end
 
-      # req = decode_request_body(PostIconRequest)
-      # image = Base64.decode64(req.image)
-      body = JSON.parse(request.body.tap(&:rewind).read, symbolize_names: true)
-      image = Base64.decode64(body[:image])
-      imgfile = IMAGE_DIR + "/#{user_id}.jpeg"
-      f = File.open(imgfile, "w")
-      f.write(image)
-      f.close()
+      user = db_conn.xquery('SELECT * FROM users WHERE id = ?', user_id).first
+      icon_path = IMAGE_DIR + "/#{user.fetch(:name)}.jpeg"
+
+      req = decode_request_body(PostIconRequest)
+      image = Base64.decode64(req.image)
+      File.binwrite(icon_path, image)
 
       icon_id = db_transaction do |tx|
-        tx.xquery('DELETE FROM icons WHERE user_id = ?', user_id)
-        tx.xquery('INSERT INTO icons (user_id, image) VALUES (?, ?)', user_id, Digest::SHA256.hexdigest(image))
+        tx.xquery('UPDATE icons SET image = ? WHERE user_id = ?', Digest::SHA256.hexdigest(image), user_id)
         tx.last_id
       end
 
