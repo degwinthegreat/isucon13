@@ -976,17 +976,8 @@ module Isupipe
 
       username = params[:username]
 
-      # ユーザごとに、紐づく配信について、累計リアクション数、累計ライブコメント数、累計売上金額を算出
+       # ユーザごとに、紐づく配信について、累計リアクション数、累計ライブコメント数、累計売上金額を算出
       # また、現在の合計視聴者数もだす
-
-      stats = db_transaction do |tx|
-        user = tx.xquery('SELECT * FROM users WHERE name = ?', username).first
-        unless user
-          raise HttpError.new(400)
-        end
-
-        # ランク算出
-        users = tx.xquery('SELECT * FROM users').to_a
 
       stats = db_transaction do |tx|
         user = tx.xquery('SELECT * FROM users WHERE name = ?', username).first
