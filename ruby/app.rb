@@ -596,12 +596,11 @@ module Isupipe
         #   end
         # end
 
-
-        hit_spam = tx.xquery(
-          'SELECT id, user_id, livestream_id, word FROM ng_words WHERE user_id = ? AND livestream_id = ? AND word = ?' ,
-          livestream_model.fetch(:user_id), livestream_model.fetch(:id), req.comment
-        ).first
-
+        ng_words = tx.xquery(
+          'SELECT id, user_id, livestream_id, word FROM ng_words WHERE user_id = ? AND livestream_id = ?' ,
+          livestream_model.fetch(:user_id), livestream_model.fetch(:id)
+        ).map { |ng_word| ng_word.fetch(:word) }
+        hit_spam = ng_words.any? { |ng_word| req.comment.include?(ng_word) }
         if hit_spam
           logger.info("[hit_spam=#{hit_spam}] comment = #{req.comment}")
           raise HttpError.new(400, 'このコメントがスパム判定されました')
