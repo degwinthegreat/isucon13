@@ -603,7 +603,7 @@ module Isupipe
 
       now = Time.now.to_i
       livecomment = db_transaction do |tx|
-        tx.xquery('INSERT INTO livecomments (user_id, livestream_id, comment, tip, created_at) VALUES (?, ?, ?, ?, ?)', user_id, livestream_id, req.comment, req.tip, now).first.fetch(:id)
+        tx.xquery('INSERT INTO livecomments (user_id, livestream_id, comment, tip, created_at) VALUES (?, ?, ?, ?, ?)', user_id, livestream_id, req.comment, req.tip, now)
         livecomment_id = tx.last_id
 
         # tips 数を加算
