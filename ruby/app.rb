@@ -330,7 +330,7 @@ module Isupipe
           if key_tag_name != ''
             # タグによる取得
             tag_id_list = [ TAGS_BY_NAME[key_tag_name].fetch(:id) ].reject(&:nil?)
-            tx.xquery('SELECT livestreams.* FROM livestreams INNER JOIN livestream_tags ON livestreams.id = livestream_tags.livestream_id WHERE livestream_tags.tag_id = ? ORDER BY livestreams.id DESC', tag_id).to_a
+            tx.xquery('SELECT livestreams.* FROM livestreams INNER JOIN livestream_tags ON livestreams.id = livestream_tags.livestream_id WHERE livestream_tags.tag_id IN (?) ORDER BY livestreams.id DESC', tag_id_list).to_a
           else
             # 検索条件なし
             query = 'SELECT * FROM livestreams ORDER BY id DESC'
