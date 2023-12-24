@@ -13,4 +13,24 @@ db = Mysql2::Client.new(
   reconnect: true,
 )
 
+def db_transaction(db, &block)
+  db.query('BEGIN')
+  ok = false
+  begin
+    retval = block.call(db)
+    db.query('COMMIT')
+    ok = true
+    retval
+  ensure
+    unless ok
+      db.query('ROLLBACK')
+    end
+  end
+end
+
+# how to use
+# db_transaction(db) do |tx|
+#   tx.xquery('SELECT * FROM themes WHERE user_id = ?', 1).first
+# end
+
 binding.irb
