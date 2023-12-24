@@ -602,7 +602,7 @@ module Isupipe
       end
 
       now = Time.now.to_i
-      livecomment_id = db_conn.xquery('INSERT INTO livecomments (user_id, livestream_id, comment, tip, created_at) VALUES (?, ?, ?, ?, ?)', user_id, livestream_id, req.comment, req.tip, now).last_id
+      livecomment_id = db_conn.xquery('INSERT INTO livecomments (user_id, livestream_id, comment, tip, created_at) VALUES (?, ?, ?, ?, ?)', user_id, livestream_id, req.comment, req.tip, now).first.fetch(:id)
 
       # tips 数を加算
       db_conn.xquery('UPDATE users SET total_tips = total_tips + ?, score = score + ? WHERE id = ?', req.tip, req.tip, livestream_model.fetch(:user_id))
