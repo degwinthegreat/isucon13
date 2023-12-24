@@ -494,20 +494,39 @@ module Isupipe
       verify_user_session!
       livestream_id = cast_as_integer(params[:livestream_id])
 
-      livecomments = db_transaction do |tx|
-        query = 'SELECT * FROM livecomments WHERE livestream_id = ? ORDER BY created_at DESC'
-        limit_str = params[:limit] || ''
-        if limit_str != ''
-          limit = cast_as_integer(limit_str)
-          query = "#{query} LIMIT #{limit}"
-        end
+      livestream_model = db_conn.xquery('SELECT * FROM livestreams WHERE id = ?', livestream_id).first
+      livestream = fill_livestream_response(db_conn, livestream_model)
 
-        tx.xquery(query, livestream_id).map do |livecomment_model|
-          fill_livecomment_response(tx, livecomment_model)
-        end
+      query = <<~SQL
+      SELECT
+        livecomments.id AS l_id,
+        livecomments.livestream_id AS l_livestream_id,
+        livecomments.comment AS l_comment,
+        livecomments.tip AS l_tip,
+        livecomments.created_at AS l_created_at,
+        users.*
+      FROM livecomments
+      INNER JOIN users ON livecomments.user_id = users.id
+      WHERE livestream_id = ?
+      SQL
+
+      limit_str = params[:limit] || ''
+      if limit_str != ''
+        limit = cast_as_integer(limit_str)
+        query = "#{query} LIMIT #{limit}"
       end
 
-      json(livecomments)
+      rows = db_conn.xquery(query, livestream_id).to_a
+      livecomments = rows.map do |livecomment_model|
+        {
+          id: livecomment_model.fetch(:l_id),
+          comment: livecomment_model.fetch(:l_comment),
+          tip: livecomment_model.fetch(:l_tip),
+          created_at: livecomment_model.fetch(:l_created_at),
+          user: fill_user_response(db_conn, livecomment_model),
+          livestream:,
+        }
+      end
     end
 
     get '/api/livestream/:livestream_id/ngwords' do
