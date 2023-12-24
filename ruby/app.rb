@@ -602,20 +602,23 @@ module Isupipe
       end
 
       now = Time.now.to_i
-      livecomment_id = db_conn.xquery('INSERT INTO livecomments (user_id, livestream_id, comment, tip, created_at) VALUES (?, ?, ?, ?, ?)', user_id, livestream_id, req.comment, req.tip, now).first.fetch(:id)
+      livecomment = db_transaction do |tx|
+        tx.xquery('INSERT INTO livecomments (user_id, livestream_id, comment, tip, created_at) VALUES (?, ?, ?, ?, ?)', user_id, livestream_id, req.comment, req.tip, now).first.fetch(:id)
+        livecomment_id = tx.last_id
 
-      # tips 数を加算
-      db_conn.xquery('UPDATE users SET total_tips = total_tips + ?, score = score + ? WHERE id = ?', req.tip, req.tip, livestream_model.fetch(:user_id))
-      db_conn.xquery('UPDATE livestreams SET total_tips = total_tips + ?, score = score + ? WHERE id = ?', req.tip, req.tip, livestream_model.fetch(:id))
+        # tips 数を加算
+        tx.xquery('UPDATE users SET total_tips = total_tips + ?, score = score + ? WHERE id = ?', req.tip, req.tip, livestream_model.fetch(:user_id))
+        tx.xquery('UPDATE livestreams SET total_tips = total_tips + ?, score = score + ? WHERE id = ?', req.tip, req.tip, livestream_model.fetch(:id))
 
-      livecomment = fill_livecomment_response(db_conn, {
-        id: livecomment_id,
-        user_id:,
-        livestream_id:,
-        comment: req.comment,
-        tip: req.tip,
-        created_at: now,
-      })
+        fill_livecomment_response(db_conn, {
+          id: livecomment_id,
+          user_id:,
+          livestream_id:,
+          comment: req.comment,
+          tip: req.tip,
+          created_at: now,
+        })
+      end
 
       status 201
       json(livecomment, json_encoder: oj_encoder)
