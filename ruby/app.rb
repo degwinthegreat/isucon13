@@ -12,6 +12,7 @@ require 'sinatra/json'
 require 'fileutils'
 
 require_relative 'tags'
+require_relative 'oj_encoder'
 
 require 'estackprof'
 
@@ -46,10 +47,15 @@ module Isupipe
     error HttpError do
       e = env['sinatra.error']
       status e.code
-      json(error: e.message)
+      json({error: e.message}, json_encoder: oj_encoder)
+      # json(error: e.message)
     end
 
     helpers do
+      def oj_encoder
+        @oj_encoder ||= OjEncoder.new
+      end
+
       def db_conn
         Thread.current[:db_conn] ||= connect_db
       end
@@ -209,16 +215,12 @@ module Isupipe
 
       puts `rm ../public/*.jpeg`
 
-      json(
-        language: 'ruby',
-      )
+      json({language: 'ruby'},json_encoder: oj_encoder)
     end
 
     # top
     get '/api/tag' do
-     json(
-        tags: TAGS,
-      )
+     json({tags: TAGS}, json_encoder: oj_encoder)
     end
 
     # 配信者のテーマ取得API
@@ -235,10 +237,7 @@ module Isupipe
         user_model
       end
 
-      json(
-        id: theme_model.fetch(:id),
-        dark_mode: theme_model.fetch(:dark_mode),
-      )
+      json({id: theme_model.fetch(:id), dark_mode: theme_model.fetch(:dark_mode)}, json_encoder: oj_encoder)
     end
 
     # livestream
@@ -309,7 +308,7 @@ module Isupipe
       end
 
       status 201
-      json(livestream)
+      json(livestream, json_encoder: oj_encoder)
     end
 
     # list livestream
@@ -339,7 +338,7 @@ module Isupipe
         fill_livestream_response(db_conn, livestream_model, all_tags: ls_tags, all_users: ls_users)
       end
 
-      json(livestreams)
+      json(livestreams, json_encoder: oj_encoder)
     end
 
     get '/api/livestream' do
@@ -360,7 +359,7 @@ module Isupipe
         fill_livestream_response(db_conn, livestream_model, all_tags: ls_tags, all_users: ls_users)
       end
 
-      json(livestreams)
+      json(livestreams, json_encoder: oj_encoder)
     end
 
     get '/api/user/:username/livestream' do
@@ -380,7 +379,7 @@ module Isupipe
         fill_livestream_response(db_conn, livestream_model, all_tags: ls_tags, all_users: ls_users)
       end
 
-      json(livestreams)
+      json(livestreams, json_encoder: oj_encoder)
     end
 
     # ユーザ視聴開始 (viewer)
@@ -441,7 +440,7 @@ module Isupipe
         fill_livestream_response(tx, livestream_model)
       end
 
-      json(livestream)
+      json(livestream, json_encoder: oj_encoder)
     end
 
     # (配信者向け)ライブコメントの報告一覧取得API
@@ -483,7 +482,7 @@ module Isupipe
         end.reject(&:nil?)
       end
 
-      json(reports)
+      json(reports, json_encoder: oj_encoder)
     end
 
     # get polling livecomment timeline
@@ -526,7 +525,7 @@ module Isupipe
         }
       end
 
-      json(livecomments)
+      json(livecomments, json_encoder: oj_encoder)
     end
 
     get '/api/livestream/:livestream_id/ngwords' do
@@ -546,7 +545,7 @@ module Isupipe
         tx.xquery('SELECT * FROM ng_words WHERE user_id = ? AND livestream_id = ? ORDER BY created_at DESC', user_id, livestream_id).to_a
       end
 
-      json(ng_words)
+      json(ng_words, json_encoder: oj_encoder)
     end
 
     PostLivecommentRequest = Data.define(
@@ -622,7 +621,7 @@ module Isupipe
       end
 
       status 201
-      json(livecomment)
+      json(livecomment, json_encoder: oj_encoder)
     end
 
     # ライブコメント報告
@@ -665,7 +664,7 @@ module Isupipe
       end
 
       status 201
-      json(report)
+      json(report, json_encoder: oj_encoder)
     end
 
     ModerateRequest = Data.define(:ng_word)
@@ -730,7 +729,7 @@ module Isupipe
       end
 
       status 201
-      json(word_id:)
+      json({word_id:}, json_encoder: oj_encoder)
     end
 
     get '/api/livestream/:livestream_id/reaction' do
@@ -764,7 +763,7 @@ module Isupipe
         )
       end
 
-      json(reactions)
+      json(reactions, json_encoder: oj_encoder)
     end
 
     PostReactionRequest = Data.define(:emoji_name)
@@ -804,7 +803,7 @@ module Isupipe
       end
 
       status 201
-      json(reaction)
+      json(reaction, json_encoder: oj_encoder)
     end
 
     BCRYPT_DEFAULT_COST = 4
@@ -856,9 +855,7 @@ module Isupipe
       icon_id = user_id
 
       status 201
-      json(
-        id: icon_id,
-      )
+      json({id: icon_id}, json_encoder: oj_encoder)
     end
 
     get '/api/user/me' do
@@ -881,7 +878,7 @@ module Isupipe
         fill_user_response(tx, user_model)
       end
 
-      json(user)
+      json(user, json_encoder: oj_encoder)
     end
 
     PostUserRequest = Data.define(
@@ -922,7 +919,7 @@ module Isupipe
       end
 
       status 201
-      json(user)
+      json(user, json_encoder: oj_encoder)
     end
 
     LoginRequest = Data.define(
@@ -975,7 +972,7 @@ module Isupipe
         fill_user_response(tx, user_model)
       end
 
-      json(user)
+      json(user, json_encoder: oj_encoder)
     end
 
     UserRankingEntry = Data.define(:username, :score)
@@ -1057,7 +1054,7 @@ module Isupipe
         }
       end
 
-      json(stats)
+      json(stats, json_encoder: oj_encoder)
     end
 
     LivestreamRankingEntry = Data.define(:livestream_id, :score)
@@ -1098,7 +1095,7 @@ module Isupipe
         }
       end
 
-      json(stats)
+      json(stats, json_encoder: oj_encoder)
     end
 
     get '/api/payment' do
@@ -1106,7 +1103,7 @@ module Isupipe
         tx.xquery('SELECT IFNULL(SUM(tip), 0) FROM livecomments', as: :array).first[0]
       end
 
-      json(total_tip:)
+      json({total_tip:}, json_encoder: oj_encoder)
     end
   end
 end
