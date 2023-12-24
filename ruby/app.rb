@@ -758,10 +758,10 @@ module Isupipe
         livestream_model.fetch(:user_id),
         *rows.map { _1.fetch(:user_id) },
       ])
-      livestream = fill_livestream_response(tx, livestream_model, all_tags: all_tags, all_users: nil)
+      livestream = fill_livestream_response(db_conn, livestream_model, all_tags: all_tags, all_users: nil)
       reactions = rows.map do |reaction_model|
-        user_model = (ls_users ? ls_users[reaction_model.fetch(:user_id)] : nil ) || tx.xquery('SELECT * FROM users WHERE id = ?', reaction_model.fetch(:user_id)).first
-        user = fill_user_response(tx, user_model)
+        user_model = (ls_users ? ls_users[reaction_model.fetch(:user_id)] : nil ) || db_conn.xquery('SELECT * FROM users WHERE id = ?', reaction_model.fetch(:user_id)).first
+        user = fill_user_response(db_conn, user_model)
 
         reaction_model.slice(:id, :emoji_name, :created_at).merge(
           user:,
