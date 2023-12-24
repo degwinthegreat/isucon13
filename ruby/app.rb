@@ -171,12 +171,12 @@ module Isupipe
         )
       end
 
-      def fill_reaction_response(tx, reaction_model)
-        user_model = tx.xquery('SELECT * FROM users WHERE id = ?', reaction_model.fetch(:user_id)).first
+      def fill_reaction_response(tx, reaction_model, livestream_model: nil, all_tags: nil, all_users: nil)
+        user_model = (all_users ? all_users[reaction_model.fetch(:user_id)] : nil ) || tx.xquery('SELECT * FROM users WHERE id = ?', reaction_model.fetch(:user_id)).first
         user = fill_user_response(tx, user_model)
 
-        livestream_model = tx.xquery('SELECT * FROM livestreams WHERE id = ?', reaction_model.fetch(:livestream_id)).first
-        livestream = fill_livestream_response(tx, livestream_model)
+        livestream_model = livestream_model || tx.xquery('SELECT * FROM livestreams WHERE id = ?', reaction_model.fetch(:livestream_id)).first
+        livestream = fill_livestream_response(tx, livestream_model, all_tags: all_tags, all_users: nil)
 
         reaction_model.slice(:id, :emoji_name, :created_at).merge(
           user:,
@@ -711,17 +711,25 @@ module Isupipe
 
       livestream_id = cast_as_integer(params[:livestream_id])
 
-      reactions = db_transaction do |tx|
-        query = 'SELECT * FROM reactions WHERE livestream_id = ? ORDER BY created_at DESC'
-        limit_str = params[:limit] || ''
-        if limit_str != ''
-          limit = cast_as_integer(limit_str)
-          query = "#{query} LIMIT #{limit}"
-        end
+      livestream_id = cast_as_integer(params[:livestream_id])
+      ls_tags = livestream_tags_preload(db_conn, [{id: livestream_id}])
 
-        tx.xquery(query, livestream_id).map do |reaction_model|
-          fill_reaction_response(tx, reaction_model)
-        end
+      livestream_model = db_conn.xquery('select * from livestreams where id = ?',livestream_id).first
+
+      query = 'SELECT * FROM reactions WHERE livestream_id = ? ORDER BY created_at DESC'
+      limit_str = params[:limit] || ''
+      if limit_str != ''
+        limit = cast_as_integer(limit_str)
+        query = "#{query} LIMIT #{limit}"
+      end
+
+      rows = db_conn.xquery(query, livestream_id).to_a
+      all_users = users_preload(db_conn, [
+        livestream_model.fetch(:user_id),
+        *rows.map { _1.fetch(:user_id) },
+      ])
+      reactions = rows.map do |reaction_model|
+        fill_reaction_response(db_conn, reaction_model, livestream_model:, all_tags: ls_tags, all_users:)
       end
 
       json(reactions)
