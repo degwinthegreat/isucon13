@@ -2001,4 +2001,4 @@ INSERT INTO users (id, name, display_name, description, password) VALUES (1000, 
 INSERT INTO themes (user_id, dark_mode) VALUES (1000, false);
 
 --  update dark_mode users tables from themes tables
-UPDATE users SET dark_mode = themes.dark_mode FROM themes WHERE users.id = themes.user_id;
+UPDATE users JOIN themes ON users.id = themes.user_id SET users.dark_mode = themes.dark_mode;
