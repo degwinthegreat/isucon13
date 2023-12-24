@@ -1018,13 +1018,22 @@ module Isupipe
             total_livecomments += 1
           end
         end
+        # ライブコメント数、チップ合計
+        total_livecomments = tx.xquery('
+          SELECT COUNT(*) as count
+          FROM livecomments
+          WHERE livestream_id IN (
+            SELECT id FROM livestreams WHERE user_id = ?
+          )
+        ', user.fetch(:id)).first.fetch(:count)
 
         # 合計視聴者数
-        viewers_count = 0
-        livestreams.each do |livestream|
-          cnt = tx.xquery('SELECT COUNT(*) FROM livestream_viewers_history WHERE livestream_id = ?', livestream.fetch(:id), as: :array).first[0]
-          viewers_count += cnt
-        end
+        livestream_ids = livestreams.map { |livestream| livestream.fetch(:id) }
+        viewers_count = tx.xquery('
+          SELECT COUNT(*) as count
+          FROM livestream_viewers_history
+          WHERE livestream_id IN (?)
+        ', livestream_ids).first.fetch(:count)
 
         # お気に入り絵文字
         favorite_emoji = tx.xquery(<<~SQL, username).first&.fetch(:emoji_name)
