@@ -185,14 +185,6 @@ module Isupipe
       end
 
       def fill_user_response(tx, user_model)
-        icon_model = tx.xquery('SELECT image FROM icons WHERE user_id = ?', user_model.fetch(:id)).first
-        icon_hash =
-          if icon_model
-            icon_model.fetch(:image)
-          else
-            NOIMAGE_HASH
-          end
-
         {
           id: user_model.fetch(:id),
           name: user_model.fetch(:name),
@@ -202,7 +194,7 @@ module Isupipe
             id: user_model.fetch(:id),
             dark_mode: user_model.fetch(:dark_mode),
           },
-          icon_hash:,
+          icon_hash: user_model.fetch(:icon_hash),
         }
       end
     end
@@ -799,18 +791,14 @@ module Isupipe
     get '/api/user/:username/icon' do
       username = params[:username]
 
-      user = ""
-      image = db_transaction do |tx|
-        user = tx.xquery('SELECT * FROM users WHERE name = ?', username).first
-        unless user
-          raise HttpError.new(404, 'not found user that has the given username')
-        end
-        tx.xquery('SELECT image FROM icons WHERE user_id = ?', user.fetch(:id)).first
+      user = db_conn.xquery('SELECT * FROM users WHERE name = ?', username).first
+      unless user
+        raise HttpError.new(404, 'not found user that has the given username')
       end
 
       content_type 'image/jpeg'
       if image
-        etag image[:image]
+        etag user.fetch(:icon_hash)
         send_file IMAGE_DIR + "/#{user.fetch(:id)}.jpeg"
       else
         etag NOIMAGE_HASH
@@ -841,11 +829,9 @@ module Isupipe
       f.write(image)
       f.close()
 
-      icon_id = db_transaction do |tx|
-        tx.xquery('DELETE FROM icons WHERE user_id = ?', user_id)
-        tx.xquery('INSERT INTO icons (user_id, image) VALUES (?, ?)', user_id, Digest::SHA256.hexdigest(image))
-        tx.last_id
-      end
+      db_conn.xquery('UPDATE users SET icon_hash = ? WHERE id = ?', Digest::SHA256.hexdigest(image), user_id)
+
+      icon_id = user[:id]
 
       status 201
       json(
@@ -908,6 +894,7 @@ module Isupipe
           name: req.name,
           display_name: req.display_name,
           description: req.description,
+          icon_hash: NOIMAGE_HASH,
           dark_mode: req.theme.fetch(:dark_mode),
         })
       end
