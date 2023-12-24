@@ -591,32 +591,31 @@ module Isupipe
         #   end
         # end
 
-        ng_words = db_conn.xquery(
-          'SELECT id, user_id, livestream_id, word FROM ng_words WHERE user_id = ? AND livestream_id = ?' ,
-          livestream_model.fetch(:user_id), livestream_model.fetch(:id)
-        ).map { |ng_word| ng_word.fetch(:word) }
-        hit_spam = ng_words.any? { |ng_word| req.comment.include?(ng_word) }
-        if hit_spam
-          logger.info("[hit_spam=#{hit_spam}] comment = #{req.comment}")
-          raise HttpError.new(400, 'このコメントがスパム判定されました')
-        end
-
-        now = Time.now.to_i
-        livecomment_id = db_conn.xquery('INSERT INTO livecomments (user_id, livestream_id, comment, tip, created_at) VALUES (?, ?, ?, ?, ?)', user_id, livestream_id, req.comment, req.tip, now).last_id
-
-        # tips 数を加算
-        db_conn.xquery('UPDATE users SET total_tips = total_tips + ?, score = score + ? WHERE id = ?', req.tip, req.tip, livestream_model.fetch(:user_id))
-        db_conn.xquery('UPDATE livestreams SET total_tips = total_tips + ?, score = score + ? WHERE id = ?', req.tip, req.tip, livestream_model.fetch(:id))
-
-        fill_livecomment_response(db_conn, {
-          id: livecomment_id,
-          user_id:,
-          livestream_id:,
-          comment: req.comment,
-          tip: req.tip,
-          created_at: now,
-        })
+      ng_words = db_conn.xquery(
+        'SELECT id, user_id, livestream_id, word FROM ng_words WHERE user_id = ? AND livestream_id = ?' ,
+        livestream_model.fetch(:user_id), livestream_model.fetch(:id)
+      ).map { |ng_word| ng_word.fetch(:word) }
+      hit_spam = ng_words.any? { |ng_word| req.comment.include?(ng_word) }
+      if hit_spam
+        logger.info("[hit_spam=#{hit_spam}] comment = #{req.comment}")
+        raise HttpError.new(400, 'このコメントがスパム判定されました')
       end
+
+      now = Time.now.to_i
+      livecomment_id = db_conn.xquery('INSERT INTO livecomments (user_id, livestream_id, comment, tip, created_at) VALUES (?, ?, ?, ?, ?)', user_id, livestream_id, req.comment, req.tip, now).last_id
+
+      # tips 数を加算
+      db_conn.xquery('UPDATE users SET total_tips = total_tips + ?, score = score + ? WHERE id = ?', req.tip, req.tip, livestream_model.fetch(:user_id))
+      db_conn.xquery('UPDATE livestreams SET total_tips = total_tips + ?, score = score + ? WHERE id = ?', req.tip, req.tip, livestream_model.fetch(:id))
+
+      livecomment = fill_livecomment_response(db_conn, {
+        id: livecomment_id,
+        user_id:,
+        livestream_id:,
+        comment: req.comment,
+        tip: req.tip,
+        created_at: now,
+      })
 
       status 201
       json(livecomment, json_encoder: oj_encoder)
