@@ -104,3 +104,5 @@ CREATE TABLE `reactions` (
   `emoji_name` VARCHAR(255) NOT NULL,
   `created_at` BIGINT NOT NULL
 ) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
+
+-- ALTER TABLE users ADD dark_mode BOOLEAN NOT NULL DEFAULT FALSE AFTER description;
