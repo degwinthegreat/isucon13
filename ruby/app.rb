@@ -316,30 +316,27 @@ module Isupipe
     get '/api/livestream/search' do
       key_tag_name = params[:tag] || ''
 
-      # fix
-      livestreams = db_transaction do |tx|
-        livestream_models =
-          if key_tag_name != ''
-            # タグによる取得
-            tag_id_list = [ TAGS_BY_NAME[key_tag_name].fetch(:id) ].reject(&:nil?)
-            tx.xquery('SELECT livestreams.* FROM livestreams INNER JOIN livestream_tags ON livestreams.id = livestream_tags.livestream_id WHERE livestream_tags.tag_id IN (?) ORDER BY livestreams.id DESC', tag_id_list).to_a
-          else
-            # 検索条件なし
-            query = 'SELECT * FROM livestreams ORDER BY id DESC'
-            limit_str = params[:limit] || ''
-            if limit_str != ''
-              limit = cast_as_integer(limit_str)
-              query = "#{query} LIMIT #{limit}"
-            end
-
-            tx.xquery(query).to_a
+      livestream_models =
+        if key_tag_name != ''
+          # タグによる取得
+          tag_id_list = [ TAGS_BY_NAME[key_tag_name].fetch(:id) ].reject(&:nil?)
+          db_conn.xquery('SELECT livestreams.* FROM livestreams INNER JOIN livestream_tags ON livestreams.id = livestream_tags.livestream_id WHERE livestream_tags.tag_id IN (?) ORDER BY livestreams.id DESC', tag_id_list).to_a
+        else
+          # 検索条件なし
+          query = 'SELECT * FROM livestreams ORDER BY id DESC'
+          limit_str = params[:limit] || ''
+          if limit_str != ''
+            limit = cast_as_integer(limit_str)
+            query = "#{query} LIMIT #{limit}"
           end
 
-        ls_tags = livestream_tags_preload(tx, livestream_models)
-        ls_users = users_preload(tx, livestream_models.map { _1.fetch(:user_id) })
-        livestream_models.map do |livestream_model|
-          fill_livestream_response(tx, livestream_model, all_tags: ls_tags, all_users: ls_users)
+          db_conn.xquery(query).to_a
         end
+
+      ls_tags = livestream_tags_preload(db_conn, livestream_models)
+      ls_users = users_preload(db_conn, livestream_models.map { _1.fetch(:user_id) })
+      livestreams = livestream_models.map do |livestream_model|
+        fill_livestream_response(db_conn, livestream_model, all_tags: ls_tags, all_users: ls_users)
       end
 
       json(livestreams)
