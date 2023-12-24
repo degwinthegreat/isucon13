@@ -221,7 +221,7 @@ end
 
 task :all => [:setup, :deploy, :initialize, :record, :bench]
 
-task :push => [:setup, :deploy, :initialize, :record] # :all
+task :push => [:setup, :deploy, :initialize, :record, :bench]
 
 desc "alp_install"
 task :alp_install do
