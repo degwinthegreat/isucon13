@@ -599,7 +599,7 @@ module Isupipe
         livecomment_id = tx.last_id
 
         # tips 数を加算
-        tx.xquery('UPDATE users SET total_tips = total_tips + ? WHERE id = ?', req.tip, livestream_model.fetch(:user_id))
+        tx.xquery('UPDATE users SET total_tips = total_tips + ?, score = score + ? WHERE id = ?', req.tip, req.tip, livestream_model.fetch(:user_id))
         tx.xquery('UPDATE livestreams SET total_tips = total_tips + ?, score = score + ? WHERE id = ?', req.tip, req.tip, livestream_model.fetch(:id))
 
         fill_livecomment_response(tx, {
@@ -773,7 +773,7 @@ module Isupipe
       reaction = db_transaction do |tx|
         # リアクション数をインクリメント
         livestream = tx.xquery('SELECT * FROM livestreams WHERE id = ?', livestream_id).first
-        tx.xquery('UPDATE users SET total_reactions = total_reactions + 1 WHERE id = ?', livestream.fetch(:user_id))
+        tx.xquery('UPDATE users SET total_reactions = total_reactions + 1, score = score + 1 WHERE id = ?', livestream.fetch(:user_id))
         tx.xquery('UPDATE livestreams SET total_reactions = total_reactions + 1, score = score + 1 WHERE id = ?', livestream_id)
 
         created_at = Time.now.to_i
@@ -1067,16 +1067,16 @@ module Isupipe
         ridx = ranking.rindex { |entry| entry.livestream_id == livestream_id }
         rank = ranking.size - ridx
 
-	# 視聴者数算出
+	      # 視聴者数算出
         viewers_count = tx.xquery('SELECT COUNT(*) FROM livestreams l INNER JOIN livestream_viewers_history h ON h.livestream_id = l.id WHERE l.id = ?', livestream_id, as: :array).first[0]
 
-	# 最大チップ額
+	      # 最大チップ額
         max_tip = tx.xquery('SELECT IFNULL(MAX(tip), 0) FROM livestreams l INNER JOIN livecomments l2 ON l2.livestream_id = l.id WHERE l.id = ?', livestream_id, as: :array).first[0]
 
-	# リアクション数
+	      # リアクション数
         total_reactions = tx.xquery('SELECT COUNT(*) FROM livestreams l INNER JOIN reactions r ON r.livestream_id = l.id WHERE l.id = ?', livestream_id, as: :array).first[0]
 
-	# スパム報告数
+	      # スパム報告数
         total_reports = tx.xquery('SELECT COUNT(*) FROM livestreams l INNER JOIN livecomment_reports r ON r.livestream_id = l.id WHERE l.id = ?', livestream_id, as: :array).first[0]
 
         {
