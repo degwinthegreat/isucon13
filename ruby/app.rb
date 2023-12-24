@@ -115,21 +115,6 @@ module Isupipe
         nil
       end
 
-      def fill_livestream_responses(tx, livestream_models, all_tags: nil, all_users: nil)
-        owner_model = (all_users ? all_users[livestream_model.fetch(:user_id)] : nil ) || tx.xquery('SELECT * FROM users WHERE id = ?', livestream_model.fetch(:user_id)).first
-        owner = fill_user_response(tx, owner_model)
-
-        tags = (all_tags ? all_tags[livestream_model.fetch(:id)] : nil) || tx.xquery('SELECT tag_id FROM livestream_tags WHERE livestream_id = ?', livestream_model.fetch(:id)).map do |livestream_tag_model|
-          TAGS_BY_ID[livestream_tag_model.fetch(:tag_id)]
-        end
-        livestream_models.map do |livestream_model|
-          livestream_model.slice(:id, :title, :description, :playlist_url, :thumbnail_url, :start_at, :end_at).merge(
-            owner:,
-            tags:,
-          )
-        end
-      end
-
       def fill_livestream_response(tx, livestream_model, all_tags: nil, all_users: nil)
         owner_model = (all_users ? all_users[livestream_model.fetch(:user_id)] : nil ) || tx.xquery('SELECT * FROM users WHERE id = ?', livestream_model.fetch(:user_id)).first
         owner = fill_user_response(tx, owner_model)
@@ -331,6 +316,7 @@ module Isupipe
     get '/api/livestream/search' do
       key_tag_name = params[:tag] || ''
 
+      # fix
       livestreams = db_transaction do |tx|
         livestream_models =
           if key_tag_name != ''
@@ -351,7 +337,9 @@ module Isupipe
 
         ls_tags = livestream_tags_preload(tx, livestream_models)
         ls_users = users_preload(tx, livestream_models.map { _1.fetch(:user_id) })
-        fill_livestream_responses(tx, livestream_models, all_tags: ls_tags, all_users: ls_users)
+        livestream_models.map do |livestream_model|
+          fill_livestream_response(tx, livestream_model, all_tags: ls_tags, all_users: ls_users)
+        end
       end
 
       json(livestreams)
@@ -371,7 +359,9 @@ module Isupipe
       ls_rows = db_conn.xquery('SELECT * FROM livestreams WHERE user_id = ?', user_id).to_a
       ls_tags = livestream_tags_preload(db_conn, ls_rows)
       ls_users = users_preload(db_conn, ls_rows.map { _1.fetch(:user_id) })
-      livestreams = fill_livestream_responses(db_conn, ls_rows, all_tags: ls_tags, all_users: ls_users)
+      livestreams = ls_rows.map do |livestream_model|
+        fill_livestream_response(db_conn, livestream_model, all_tags: ls_tags, all_users: ls_users)
+      end
 
       json(livestreams)
     end
@@ -389,7 +379,9 @@ module Isupipe
       ls_tags = livestream_tags_preload(db_conn, ls_rows)
       ls_users = users_preload(db_conn, ls_rows.map { _1.fetch(:user_id) })
 
-      livestreams = fill_livestream_responses(db_conn, ls_rows, all_tags: ls_tags, all_users: ls_users)
+      livestreams = ls_rows.map do |livestream_model|
+        fill_livestream_response(db_conn, livestream_model, all_tags: ls_tags, all_users: ls_users)
+      end
 
       json(livestreams)
     end
