@@ -84,9 +84,9 @@ max_allowed_packet	= 100M
 thread_stack		= 192K
 thread_cache_size       = 8
 
-slow_query_log = 1
-slow-query_log_file = /var/log/mysql/slow.log
-long_query_time = 0.1
+# slow_query_log = 1
+# slow-query_log_file = /var/log/mysql/slow.log
+# long_query_time = 0.1
 
 ## innodb
 innodb_buffer_pool_size = 512M
