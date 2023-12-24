@@ -1064,6 +1064,11 @@ module Isupipe
           raise HttpError.new(400)
         end
 
+      stats = db_transaction do |tx|
+        unless tx.xquery('SELECT * FROM livestreams WHERE id = ?', livestream_id).first
+          raise HttpError.new(400)
+        end
+
         # ランク算出
         ranking = tx.xquery('SELECT * FROM livestreams').map do |livestream|
           reactions = tx.xquery('SELECT COUNT(*) FROM livestreams l INNER JOIN reactions r ON l.id = r.livestream_id WHERE l.id = ?', livestream.fetch(:id), as: :array).first[0]
