@@ -677,7 +677,7 @@ module Isupipe
       req = decode_request_body(ModerateRequest)
 
       word_id = db_transaction do |tx|
-     # 配信者自身の配信に対するmoderateなのかを検証
+        # 配信者自身の配信に対するmoderateなのかを検証
         owned_livestreams = tx.xquery('SELECT * FROM livestreams WHERE id = ? AND user_id = ?', livestream_id, user_id).to_a
         if owned_livestreams.empty?
           raise HttpError.new(400, "A streamer can't moderate livestreams that other streamers own")

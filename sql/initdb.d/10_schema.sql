@@ -109,3 +109,6 @@ CREATE TABLE `reactions` (
 -- ALTER TABLE users ADD total_tips BIGINT NOT NULL DEFAULT 0;
 -- ALTER TABLE users ADD total_reactions BIGINT NOT NULL DEFAULT 0;
 -- ALTER TABLE users ADD score BIGINT NOT NULL DEFAULT 0;
+-- ALTER TABLE livestreams ADD total_tips BIGINT NOT NULL DEFAULT 0;
+-- ALTER TABLE livestreams ADD total_reactions BIGINT NOT NULL DEFAULT 0;
+-- ALTER TABLE livestreams ADD score BIGINT NOT NULL DEFAULT 0;
