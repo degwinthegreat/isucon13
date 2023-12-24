@@ -145,12 +145,12 @@ module Isupipe
         end.to_h
       end
 
-      def fill_livecomment_response(tx, livecomment_model)
-        comment_owner_model = tx.xquery('SELECT * FROM users WHERE id = ?', livecomment_model.fetch(:user_id)).first
+      def fill_livecomment_response(tx, livecomment_model, livestream_model: nil, all_livestream_tags: nil, all_users: nil)
+        comment_owner_model = (all_users ? all_users[livecomment_model.fetch(:user_id)] : nil ) || tx.xquery('SELECT * FROM users WHERE id = ?', livecomment_model.fetch(:user_id)).first
         comment_owner = fill_user_response(tx, comment_owner_model)
 
-        livestream_model = tx.xquery('SELECT * FROM livestreams WHERE id = ?', livecomment_model.fetch(:livestream_id)).first
-        livestream = fill_livestream_response(tx, livestream_model)
+        livestream_model = livestream_model || tx.xquery('SELECT * FROM livestreams WHERE id = ?', livecomment_model.fetch(:livestream_id)).first
+        livestream = fill_livestream_response(tx, livestream_model, all_tags: all_livestream_tags, all_users: )
 
         livecomment_model.slice(:id, :comment, :tip, :created_at).merge(
           user: comment_owner,
@@ -158,12 +158,12 @@ module Isupipe
         )
       end
 
-      def fill_livecomment_report_response(tx, report_model)
-        reporter_model = tx.xquery('SELECT * FROM users WHERE id = ?', report_model.fetch(:user_id)).first
+      def fill_livecomment_report_response(tx, report_model, livecomment_model: nil, livestream_model: nil, all_livestream_tags: nil, all_users: nil)
+        reporter_model = (all_users ? all_users[report_model.fetch(:user_id)] : nil ) || tx.xquery('SELECT * FROM users WHERE id = ?', report_model.fetch(:user_id)).first
         reporter = fill_user_response(tx, reporter_model)
 
-        livecomment_model = tx.xquery('SELECT * FROM livecomments WHERE id = ?', report_model.fetch(:livecomment_id)).first
-        livecomment = fill_livecomment_response(tx, livecomment_model)
+        livecomment_model = livecomment_model || tx.xquery('SELECT * FROM livecomments WHERE id = ?', report_model.fetch(:livecomment_id)).first
+        livecomment = fill_livecomment_response(tx, livecomment_model, livestream_model:, all_livestream_tags:, all_users: )
 
         report_model.slice(:id, :created_at).merge(
           reporter:,
@@ -488,9 +488,22 @@ module Isupipe
           raise HttpError.new(403, "can't get other streamer's livecomment reports")
         end
 
-        tx.xquery('SELECT * FROM livecomment_reports WHERE livestream_id = ?', livestream_id).map do |report_model|
-          fill_livecomment_report_response(tx, report_model)
-        end
+        rows = tx.xquery('SELECT * FROM livecomment_reports WHERE livestream_id = ?', livestream_id).to_a
+        livecomment_models = rows.empty? ? {}  : (
+          tx.xquery('SELECT * FROM livecomments WHERE id IN (?)', rows.map {_1.fetch(:livecomment_id) })
+          .map { [_1.fetch(:id), _1] }
+          .to_h
+        )
+        all_livestream_tags = livestream_tags_preload(tx, [livestream_model])
+        all_users = users_preload(tx, [
+          livestream_model.fetch(:user_id),
+          *rows.map { _1.fetch(:user_id) },
+          *livecomment_models.each_value.map { _1.fetch(:user_id) },
+        ])
+        rows.map do |report_model|
+          livecomment_model  = livecomment_models[report_model.fetch(:livecomment_id)]
+          !livecomment_model.nil? ?  fill_livecomment_report_response(tx, report_model, livestream_model:, livecomment_model:, all_livestream_tags:, all_users:) : nil
+        end.reject(&:nil?)
       end
 
       json(reports)
