@@ -598,6 +598,9 @@ module Isupipe
         tx.xquery('INSERT INTO livecomments (user_id, livestream_id, comment, tip, created_at) VALUES (?, ?, ?, ?, ?)', user_id, livestream_id, req.comment, req.tip, now)
         livecomment_id = tx.last_id
 
+        # tips 数を加算
+        tx.xquery('UPDATE users SET total_tips = total_tips + ? WHERE id = ?', req.tip, livestream_model.fetch(:user_id))
+
         fill_livecomment_response(tx, {
           id: livecomment_id,
           user_id:,
@@ -683,14 +686,26 @@ module Isupipe
         tx.xquery('INSERT INTO ng_words(user_id, livestream_id, word, created_at) VALUES (?, ?, ?, ?)', user_id, livestream_id, req.ng_word, Time.now.to_i)
         word_id = tx.last_id
 
-        query = <<~SQL
-          DELETE lc
-          FROM livecomments lc
-          INNER JOIN ng_words nw ON lc.livestream_id = nw.livestream_id
-          WHERE lc.livestream_id = ? AND lc.comment LIKE CONCAT('%', nw.word, '%')
-        SQL
+        # NGワードにヒットする過去の投稿も全削除する
+        tx.xquery('SELECT * FROM ng_words WHERE livestream_id = ?', livestream_id).each do |ng_word|
+          query <<~SQL
+            SELECT * FROM livecomments
+            WHERE
+            livestream_id = ? AND
+            (SELECT COUNT(*)
+            FROM
+            (SELECT ? AS text) AS texts
+            INNER JOIN
+            (SELECT CONCAT('%', ?, '%')	AS pattern) AS patterns
+            ON texts.text LIKE patterns.pattern) >= 1
+          SQL
 
-        tx.xquery(query, livestream_id)
+          livecomments = tx.xquery(query, livestream_id, ng_word.fetch(:word)).to_a
+          total_tips = livecomments.map {|lc| lc.fetch(:tip) }.sum
+
+          tx.xquery('DELETE FROM livecomments WHERE id IN (?)', livecomments.map {|lc| lc.fetch(:id) })
+          tx.xquery('UPDATE users SET total_tips = total_tips - ? WHERE id = ?', total_tips, livestream_model.fetch(:user_id))
+        end
 
         # OLD - NGワードにヒットする過去の投稿も全削除する
         # tx.xquery('SELECT * FROM ng_words WHERE livestream_id = ?', livestream_id).each do |ng_word|
@@ -766,6 +781,10 @@ module Isupipe
       req = decode_request_body(PostReactionRequest)
 
       reaction = db_transaction do |tx|
+        # リアクション数をインクリメント
+        livestream = tx.xquery('SELECT * FROM livestreams WHERE id = ?', livestream_id).first
+        tx.xquery('UPDATE users SET total_reactions = total_reactions + 1 WHERE id = ?', livestream.fetch(:user_id))
+
         created_at = Time.now.to_i
         tx.xquery('INSERT INTO reactions (user_id, livestream_id, emoji_name, created_at) VALUES (?, ?, ?, ?)', user_id, livestream_id, req.emoji_name, created_at)
         reaction_id = tx.last_id
