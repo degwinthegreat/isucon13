@@ -803,6 +803,7 @@ module Isupipe
         etag image[:image]
         send_file IMAGE_DIR + "/#{user.fetch(:id)}.jpeg"
       else
+        etag NOIMAGE_HASH
         send_file FALLBACK_IMAGE
       end
     end
