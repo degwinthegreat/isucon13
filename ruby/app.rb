@@ -742,8 +742,6 @@ module Isupipe
       verify_user_session!
 
       livestream_id = cast_as_integer(params[:livestream_id])
-
-      livestream_id = cast_as_integer(params[:livestream_id])
       ls_tags = livestream_tags_preload(db_conn, [{id: livestream_id}])
 
       livestream_model = db_conn.xquery('select * from livestreams where id = ?',livestream_id).first
@@ -760,8 +758,15 @@ module Isupipe
         livestream_model.fetch(:user_id),
         *rows.map { _1.fetch(:user_id) },
       ])
+      livestream = fill_livestream_response(tx, livestream_model, all_tags: all_tags, all_users: nil)
       reactions = rows.map do |reaction_model|
-        fill_reaction_response(db_conn, reaction_model, livestream_model:, all_tags: ls_tags, all_users:)
+        user_model = (ls_users ? ls_users[reaction_model.fetch(:user_id)] : nil ) || tx.xquery('SELECT * FROM users WHERE id = ?', reaction_model.fetch(:user_id)).first
+        user = fill_user_response(tx, user_model)
+
+        reaction_model.slice(:id, :emoji_name, :created_at).merge(
+          user:,
+          livestream:,
+        )
       end
 
       json(reactions)
