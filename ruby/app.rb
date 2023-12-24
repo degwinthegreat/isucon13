@@ -113,33 +113,34 @@ module Isupipe
         nil
       end
 
-      def fill_livestream_response(tx, livestream_model)
-        owner_model = tx.xquery('SELECT * FROM users WHERE id = ?', livestream_model.fetch(:user_id)).first
+      def fill_livestream_response(tx, livestream_model, all_tags: nil, all_users: nil)
+        owner_model = (all_users ? all_users[livestream_model.fetch(:user_id)] : nil ) || tx.xquery('SELECT * FROM users WHERE id = ?', livestream_model.fetch(:user_id)).first
         owner = fill_user_response(tx, owner_model)
 
-        # Get all livestream_tag_models for this livestream in one query
-        livestream_tag_ids = tx.xquery('SELECT tag_id FROM livestream_tags WHERE livestream_id = ?', livestream_model.fetch(:id), as: :array).map(&:first)
-
-        tags_models = []
-        if livestream_tag_ids.empty?
-          tags_models = []
-        else
-          # Get all tags in one query using WHERE id IN
-          tags_models = tx.xquery('SELECT * FROM tags WHERE id IN (?)', livestream_tag_ids)
-        end
-
-        # Map the tags_models to the required format
-        tags = tags_models.map do |tag_model|
-          {
-            id: tag_model.fetch(:id),
-            name: tag_model.fetch(:name),
-          }
+        tags = (all_tags ? all_tags[livestream_model.fetch(:id)] : nil) || tx.xquery('SELECT tag_id FROM livestream_tags WHERE livestream_id = ?', livestream_model.fetch(:id)).map do |livestream_tag_model|
+          TAGS_BY_ID[livestream_tag_model.fetch(:tag_id)]
         end
 
         livestream_model.slice(:id, :title, :description, :playlist_url, :thumbnail_url, :start_at, :end_at).merge(
           owner:,
           tags:,
         )
+      end
+
+      def livestream_tags_preload(tx, livestream_models)
+        return {} if livestream_models.empty?
+        all_tags = tx.xquery('select livestream_tags.livestream_id, livestream_tags.tag_id from livestream_tags where livestream_id in (?)', livestream_models.map { _1.fetch(:id) }).to_a.group_by do |row|
+          row.fetch(:livestream_id)
+        end.transform_values do |vs|
+          vs.map { TAGS_BY_ID[_1.fetch(:tag_id)] }
+        end
+      end
+
+      def users_preload(tx, user_ids)
+        return {} if user_ids.empty?
+        tx.xquery('select * from users where id in (?)', user_ids).map do |row|
+          [row.fetch(:id), row]
+        end.to_h
       end
 
       def fill_livecomment_response(tx, livecomment_model)
@@ -352,8 +353,10 @@ module Isupipe
             tx.xquery(query).to_a
           end
 
+        ls_tags = livestream_tags_preload(tx, livestream_models)
+        ls_users = users_preload(tx, livestream_models.map { _1.fetch(:user_id) })
         livestream_models.map do |livestream_model|
-          fill_livestream_response(tx, livestream_model)
+          fill_livestream_response(tx, livestream_model, all_tags: ls_tags, all_users: ls_users)
         end
       end
 
@@ -371,10 +374,11 @@ module Isupipe
         raise HttpError.new(401)
       end
 
-      livestreams = db_transaction do |tx|
-        tx.xquery('SELECT * FROM livestreams WHERE user_id = ?', user_id).map do |livestream_model|
-          fill_livestream_response(tx, livestream_model)
-        end
+      ls_rows = db_conn.xquery('SELECT * FROM livestreams WHERE user_id = ?', user_id).to_a
+      ls_tags = livestream_tags_preload(db_conn, ls_rows)
+      ls_users = users_preload(db_conn, ls_rows.map { _1.fetch(:user_id) })
+      livestreams = ls_rows.map do |livestream_model|
+        fill_livestream_response(db_conn, livestream_model, all_tags: ls_tags, all_users: ls_users)
       end
 
       json(livestreams)
@@ -384,15 +388,17 @@ module Isupipe
       verify_user_session!
       username = params[:username]
 
-      livestreams = db_transaction do |tx|
-        user = tx.xquery('SELECT * FROM users WHERE name = ?', username).first
-        unless user
-          raise HttpError.new(404, 'user not found')
-        end
+      user = db_conn.xquery('SELECT * FROM users WHERE name = ?', username).first
+      unless user
+        raise HttpError.new(404, 'user not found')
+      end
 
-        tx.xquery('SELECT * FROM livestreams WHERE user_id = ?', user.fetch(:id)).map do |livestream_model|
-          fill_livestream_response(tx, livestream_model)
-        end
+      ls_rows = db_conn.xquery('SELECT * FROM livestreams WHERE user_id = ?', user.fetch(:id)).to_a
+      ls_tags = livestream_tags_preload(db_conn, ls_rows)
+      ls_users = users_preload(db_conn, ls_rows.map { _1.fetch(:user_id) })
+
+      livestreams = ls_rows.map do |livestream_model|
+        fill_livestream_response(db_conn, livestream_model, all_tags: ls_tags, all_users: ls_users)
       end
 
       json(livestreams)
