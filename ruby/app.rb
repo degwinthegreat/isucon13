@@ -11,6 +11,8 @@ require 'sinatra/base'
 require 'sinatra/json'
 require 'fileutils'
 
+require_relative 'tags'
+
 require 'estackprof'
 
 module Isupipe
@@ -337,7 +339,7 @@ module Isupipe
         livestream_models =
           if key_tag_name != ''
             # タグによる取得
-            tag_id_list = tx.xquery('SELECT id FROM tags WHERE name = ?', key_tag_name, as: :array).map(&:first)
+            tag_id_list = [ TAGS_BY_NAME[key_tag_name].fetch(:id) ].reject(&:nil?)
             tx.xquery('SELECT * FROM livestream_tags WHERE tag_id IN (?) ORDER BY livestream_id DESC', tag_id_list).map do |key_tagged_livestream|
               tx.xquery('SELECT * FROM livestreams WHERE id = ?', key_tagged_livestream.fetch(:livestream_id)).first
             end
