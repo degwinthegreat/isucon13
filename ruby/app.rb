@@ -600,6 +600,7 @@ module Isupipe
 
         # tips 数を加算
         tx.xquery('UPDATE users SET total_tips = total_tips + ? WHERE id = ?', req.tip, livestream_model.fetch(:user_id))
+        tx.xquery('UPDATE livestreams SET total_tips = total_tips + ?, score = score + ? WHERE id = ?', req.tip, req.tip, livestream_model.fetch(:id))
 
         fill_livecomment_response(tx, {
           id: livecomment_id,
@@ -773,6 +774,7 @@ module Isupipe
         # リアクション数をインクリメント
         livestream = tx.xquery('SELECT * FROM livestreams WHERE id = ?', livestream_id).first
         tx.xquery('UPDATE users SET total_reactions = total_reactions + 1 WHERE id = ?', livestream.fetch(:user_id))
+        tx.xquery('UPDATE livestreams SET total_reactions = total_reactions + 1, score = score + 1 WHERE id = ?', livestream_id)
 
         created_at = Time.now.to_i
         tx.xquery('INSERT INTO reactions (user_id, livestream_id, emoji_name, created_at) VALUES (?, ?, ?, ?)', user_id, livestream_id, req.emoji_name, created_at)
