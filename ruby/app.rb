@@ -677,7 +677,7 @@ module Isupipe
       req = decode_request_body(ModerateRequest)
 
       word_id = db_transaction do |tx|
-        # 配信者自身の配信に対するmoderateなのかを検証
+     # 配信者自身の配信に対するmoderateなのかを検証
         owned_livestreams = tx.xquery('SELECT * FROM livestreams WHERE id = ? AND user_id = ?', livestream_id, user_id).to_a
         if owned_livestreams.empty?
           raise HttpError.new(400, "A streamer can't moderate livestreams that other streamers own")
@@ -686,25 +686,14 @@ module Isupipe
         tx.xquery('INSERT INTO ng_words(user_id, livestream_id, word, created_at) VALUES (?, ?, ?, ?)', user_id, livestream_id, req.ng_word, Time.now.to_i)
         word_id = tx.last_id
 
-        # NGワードにヒットする過去の投稿も全削除する
-        tx.xquery('SELECT * FROM ng_words WHERE livestream_id = ?', livestream_id).each do |ng_word|
-          query = <<~SQL
-            SELECT * FROM livecomments
-            WHERE
-            livestream_id = ? AND
-            (SELECT COUNT(*)
-            FROM
-            (SELECT ? AS text) AS texts
-            INNER JOIN
-            (SELECT CONCAT('%', ?, '%')	AS pattern) AS patterns
-            ON texts.text LIKE patterns.pattern) >= 1
-          SQL
+        # 過去の NG ワードはスキャン不要
+        livecomments = tx.xquery('SELECT * FROM livecomments WHERE livestream_id = ? AND comment LIKE ?', livestream_id, "%#{req.ng_word}%").to_a
 
-          livecomments = tx.xquery(query, livestream_id, ng_word.fetch(:word)).to_a
-          total_tips = livecomments.map {|lc| lc.fetch(:tip) }.sum
-
-          tx.xquery('DELETE FROM livecomments WHERE id IN (?)', livecomments.map {|lc| lc.fetch(:id) })
-          tx.xquery('UPDATE users SET total_tips = total_tips - ? WHERE id = ?', total_tips, livestream_model.fetch(:user_id))
+        unless livecomments.empty?
+          tx.xquery("DELETE FROM livecomments WHERE id IN (?)", livecomments.map {|lc| lc.fetch(:id) })
+          total_tips = livecomments.map {|lc| lc.fetch(:tip) }.inject(:+)
+          tx.xquery('UPDATE users SET total_tips = total_tips - ?, score = score - ? WHERE id = ?', total_tips, total_tips, user_id)
+          tx.xquery('UPDATE livestreams SET total_tips = total_tips - ?, score = score - ? WHERE id = ?', total_tips, total_tips, livestream_id)
         end
 
         # OLD - NGワードにヒットする過去の投稿も全削除する
