@@ -831,7 +831,7 @@ module Isupipe
 
       db_conn.xquery('UPDATE users SET icon_hash = ? WHERE id = ?', Digest::SHA256.hexdigest(image), user_id)
 
-      icon_id = user[:id]
+      icon_id = user_id
 
       status 201
       json(
