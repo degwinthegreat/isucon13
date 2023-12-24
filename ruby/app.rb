@@ -1064,11 +1064,6 @@ module Isupipe
           raise HttpError.new(400)
         end
 
-      stats = db_transaction do |tx|
-        unless tx.xquery('SELECT * FROM livestreams WHERE id = ?', livestream_id).first
-          raise HttpError.new(400)
-        end
-
         # ランク算出
         ranking = tx.xquery('SELECT id FROM livestreams ORDER BY score ASC, id ASC').to_a
         ridx = ranking.rindex { |entry| entry.fetch(:id) == livestream_id }
