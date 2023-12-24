@@ -504,7 +504,9 @@ module Isupipe
           livecomments.comment AS l_comment,
           livecomments.tip AS l_tip,
           livecomments.created_at AS l_created_at
+          users.*
         FROM livecomments
+        INNER JOIN users ON livecomments.user_id = users.id
         WHERE livestream_id = ?
       SQL
 
