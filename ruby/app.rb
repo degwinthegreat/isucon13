@@ -813,7 +813,7 @@ module Isupipe
     get '/api/user/:username/icon' do
       username = params[:username]
 
-      user = db_conn.xquery('SELECT icon_hash FROM users WHERE name = ?', username).first
+      user = db_conn.xquery('SELECT id, icon_hash FROM users WHERE name = ?', username).first
       unless user
         raise HttpError.new(404, 'not found user that has the given username')
       end
