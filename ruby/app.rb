@@ -226,17 +226,8 @@ module Isupipe
 
     # top
     get '/api/tag' do
-      tag_models = db_transaction do |tx|
-        tx.query('SELECT * FROM tags')
-      end
-
-      json(
-        tags: tag_models.map { |tag_model|
-          {
-            id: tag_model.fetch(:id),
-            name: tag_model.fetch(:name),
-          }
-        },
+     json(
+        tags: TAGS,
       )
     end
 
