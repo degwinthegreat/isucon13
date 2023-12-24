@@ -498,16 +498,16 @@ module Isupipe
       livestream = fill_livestream_response(db_conn, livestream_model)
 
       query = <<~SQL
-      SELECT
-        livecomments.id AS l_id,
-        livecomments.livestream_id AS l_livestream_id,
-        livecomments.comment AS l_comment,
-        livecomments.tip AS l_tip,
-        livecomments.created_at AS l_created_at,
-        users.*
-      FROM livecomments
-      INNER JOIN users ON livecomments.user_id = users.id
-      WHERE livestream_id = ?
+        SELECT
+          livecomments.id AS l_id,
+          livecomments.livestream_id AS l_livestream_id,
+          livecomments.comment AS l_comment,
+          livecomments.tip AS l_tip,
+          livecomments.created_at AS l_created_at,
+          users.*
+        FROM livecomments
+        INNER JOIN users ON livecomments.user_id = users.id
+        WHERE livestream_id = ?
       SQL
 
       limit_str = params[:limit] || ''
