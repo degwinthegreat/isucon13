@@ -797,12 +797,12 @@ module Isupipe
       end
 
       content_type 'image/jpeg'
-      if image
-        etag user.fetch(:icon_hash)
-        send_file IMAGE_DIR + "/#{user.fetch(:id)}.jpeg"
-      else
+      if user.fetch(:icon_hash) == NOIMAGE_HASH
         etag NOIMAGE_HASH
         send_file FALLBACK_IMAGE
+      else
+        etag user.fetch(:icon_hash)
+        send_file IMAGE_DIR + "/#{user.fetch(:id)}.jpeg"
       end
     end
 
